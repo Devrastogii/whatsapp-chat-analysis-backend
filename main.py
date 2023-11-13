@@ -1,14 +1,12 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import re
 
 app = Flask(__name__)
 CORS(app, origins=['http://localhost:3000'], supports_credentials=True)
-
-file_content_dict = {}
 
 @app.route("/")
 def hello_world():
@@ -18,16 +16,18 @@ def hello_world():
 def fileData():
     file = request.files['file']    
     file_content = file.read().decode('utf-8')
+    contactName = request.form['op']
+    print(contactName)
 
-    # file_content_dict['file_content'] = file_content
-
-    df = getData(file_content)
+    df = generateDf(file_content, contactName)
     words = countWords(df)
     msg = countMsg(df)
+    media = countMedia(df)
+    name = getNames(df)
     
-    return {'file':file_content, 'words': words, 'msg': msg}
+    return {'file':file_content, 'words': words, 'msg': msg, 'media': media, 'name': name}
 
-def getData(file_content):
+def generateDf(file_content, contactName):
 
     # Data Processing
 
@@ -38,7 +38,7 @@ def getData(file_content):
 
     df['Name'] = df['Message'].apply(lambda x: x.split(':')[0])
     df['Message'] = df['Message'].apply(lambda x: "".join(x.split(':')[1:]))
-    df['Message'] = df['Message'].apply(lambda x: x.replace('\n', ''))
+    df['Message'] = df['Message'].apply(lambda x: x.replace('\n', ''))    
 
     dateTime = re.findall(date_pattern, file_content)[5:]
 
@@ -62,10 +62,21 @@ def getData(file_content):
 
     df = df[['Date', 'Day', 'Month', 'Year', 'Hour', 'Minute', 'Name', 'Message']]
 
+    name = []
+
+    for i in df['Name']:
+        if 'added' not in i and 'joined' not in i and 'changed' not in i:
+            name.append(i)
+        
+    df = df[df['Name'].isin(name)]
+
+    if contactName != 'overall':
+        df = df[df['Name'] == contactName]        
+
     return df
 
 def countWords(df):
-    words = 0
+    words = 0    
 
     for i in df['Message']:
         words += len(i)
@@ -75,5 +86,11 @@ def countWords(df):
 def countMsg(df):
     return df.shape[0]
 
+def countMedia(df):    
+    new_df = df[df['Message'] == '<Media omitted>']
+    return new_df.shape[0]
+
+def getNames(df):    
+    return list(df['Name'].unique())
 
 app.run(debug=True)
