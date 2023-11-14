@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import re
+from urlextract import URLExtract
+import json
 
 app = Flask(__name__)
 CORS(app, origins=['http://localhost:3000'], supports_credentials=True)
@@ -24,8 +26,14 @@ def fileData():
     msg = countMsg(df)
     media = countMedia(df)
     name = getNames(df)
+    link = countLinks(df)
+    # active = activeUserGraph(df)
+
+    # print(dict(active))
+
+    active = df['Name'].value_counts().head()    
     
-    return {'file':file_content, 'words': words, 'msg': msg, 'media': media, 'name': name}
+    return {'file':file_content, 'words': words, 'msg': msg, 'media': media, 'name': name, 'link': link, 'activeNames': active.index.tolist(), 'activeValues': active.values.tolist()}
 
 def generateDf(file_content, contactName):
 
@@ -92,5 +100,21 @@ def countMedia(df):
 
 def getNames(df):    
     return list(df['Name'].unique())
+
+def countLinks(df):
+    link = []
+
+    extractor = URLExtract()
+    
+    for i in df['Message']:
+        link.extend(extractor.find_urls(i))
+
+    return len(link)
+
+def activeUserGraph(df):
+
+    active = df['Name'].value_counts().head()
+
+    return json.dumps({'labels': active.values.tolist(), 'data': active.index.tolist()})
 
 app.run(debug=True)
