@@ -6,6 +6,9 @@ from flask_cors import CORS
 import re
 from urlextract import URLExtract
 import json
+from wordcloud import WordCloud
+import emoji
+from collections import Counter
 
 app = Flask(__name__)
 CORS(app, origins=['http://localhost:3000'], supports_credentials=True)
@@ -27,13 +30,13 @@ def fileData():
     media = countMedia(df)
     name = getNames(df)
     link = countLinks(df)
-    # active = activeUserGraph(df)
+    percentage = percentageMsgSent(df)
 
-    # print(dict(active))
-
-    active = df['Name'].value_counts().head()    
+    active = df['Name'].value_counts().head() 
+    emoji_df = frequentEmojis(df)
+    # wordcloud(df)       
     
-    return {'file':file_content, 'words': words, 'msg': msg, 'media': media, 'name': name, 'link': link, 'activeNames': active.index.tolist(), 'activeValues': active.values.tolist()}
+    return {'file':file_content, 'words': words, 'msg': msg, 'media': media, 'name': name, 'link': link, 'activeNames': active.index.tolist(), 'activeValues': active.values.tolist(), 'percentage': percentage, 'emoji': emoji_df['Emoji'].tolist(), 'number': emoji_df['Number'].tolist()}
 
 def generateDf(file_content, contactName):
 
@@ -116,5 +119,24 @@ def activeUserGraph(df):
     active = df['Name'].value_counts().head()
 
     return json.dumps({'labels': active.values.tolist(), 'data': active.index.tolist()})
+
+def percentageMsgSent(df):
+    percentage = (((df['Name'].value_counts().values / df['Name'].value_counts().values.sum())) * 100)[:5]
+    return percentage.tolist()
+
+def wordcloud(df):
+    wc = WordCloud(width=500, height=500, min_font_size=5, background_color='white')
+    df_wc = wc.generate(df['Message'].str.cat(sep=" "))
+    plt.imshow(df_wc)
+    plt.show()
+
+def frequentEmojis(df):
+    emojis = []
+
+    for msg in df['Message']:
+        emojis.extend([c for c in msg if c in emoji.EMOJI_DATA])
+
+    d = pd.DataFrame(Counter(emojis).most_common(10), columns=['Emoji', 'Number'])
+    return d
 
 app.run(debug=True)
