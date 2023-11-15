@@ -1,7 +1,5 @@
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request
 from flask_cors import CORS
 import re
 from urlextract import URLExtract
@@ -37,9 +35,10 @@ def fileData():
     active = df['Name'].value_counts().head() 
     emoji_df = frequentEmojis(df)
     months = df['Month'].value_counts().head()
-    img = wordcloud(df)       
+    img = wordcloud(df)   
+    commonWord = commonWords(df)    
     
-    return {'file':file_content, 'words': words, 'msg': msg, 'media': media, 'name': name, 'link': link, 'activeNames': active.index.tolist(), 'activeValues': active.values.tolist(), 'percentage': percentage, 'emoji': emoji_df['Emoji'].tolist(), 'number': emoji_df['Number'].tolist(), 'monthName': months.index.tolist(), 'monthValues': months.values.tolist(), 'image': img}
+    return {'file':file_content, 'words': words, 'msg': msg, 'media': media, 'name': name, 'link': link, 'activeNames': active.index.tolist(), 'activeValues': active.values.tolist(), 'percentage': percentage, 'emoji': emoji_df['Emoji'].tolist(), 'number': emoji_df['Number'].tolist(), 'monthName': months.index.tolist(), 'monthValues': months.values.tolist(), 'image': img, 'commonWords': commonWord['Words'].tolist(), 'commonValues': commonWord['Number'].tolist()}
 
 def generateDf(file_content, contactName):
 
@@ -62,7 +61,7 @@ def generateDf(file_content, contactName):
     df['DateTime'] = dateTime    
     df['Date'] = df['DateTime'].apply(lambda x: x.split(',')[0])
     df['Time'] = df['DateTime'].apply(lambda x: x.split(',')[1].replace('-', ''))
-    df['Date'] = pd.to_datetime(df['Date'])
+    df['Date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y')
 
     df['Day'] = df['Date'].dt.day_name()
     df['Month'] = df['Date'].dt.month_name()
@@ -79,7 +78,7 @@ def generateDf(file_content, contactName):
     name = []
 
     for i in df['Name']:
-        if 'added' not in i and 'joined' not in i and 'changed' not in i:
+        if 'added' not in i and 'joined' not in i and 'changed' not in i and 'left' not in i and 'removed' not in i:
             name.append(i)
         
     df = df[df['Name'].isin(name)]
@@ -128,7 +127,9 @@ def percentageMsgSent(df):
     return percentage.tolist()
 
 def wordcloud(df):
+    df = df[df['Message'] != "<Media omitted>"]
     wc = WordCloud(width=500, height=500, min_font_size=5, background_color='white')
+    wc.generate(df['Message'].str.cat(sep=" "))
     img_buf = BytesIO()
     wc.to_image().save(img_buf, format='PNG')
     img_buf.seek(0)
@@ -146,5 +147,9 @@ def frequentEmojis(df):
 
     d = pd.DataFrame(Counter(emojis).most_common(10), columns=['Emoji', 'Number'])
     return d
+
+def commonWords(df):
+    df = df[df['Message'] != "<Media omitted>"]
+    return pd.DataFrame(Counter(df['Message']).most_common(10), columns=['Words', 'Number'])
 
 app.run(debug=True)
