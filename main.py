@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import re
 from urlextract import URLExtract
@@ -9,6 +9,8 @@ import json
 from wordcloud import WordCloud
 import emoji
 from collections import Counter
+import base64
+from io import BytesIO
 
 app = Flask(__name__)
 CORS(app, origins=['http://localhost:3000'], supports_credentials=True)
@@ -34,9 +36,10 @@ def fileData():
 
     active = df['Name'].value_counts().head() 
     emoji_df = frequentEmojis(df)
-    # wordcloud(df)       
+    months = df['Month'].value_counts().head()
+    img = wordcloud(df)       
     
-    return {'file':file_content, 'words': words, 'msg': msg, 'media': media, 'name': name, 'link': link, 'activeNames': active.index.tolist(), 'activeValues': active.values.tolist(), 'percentage': percentage, 'emoji': emoji_df['Emoji'].tolist(), 'number': emoji_df['Number'].tolist()}
+    return {'file':file_content, 'words': words, 'msg': msg, 'media': media, 'name': name, 'link': link, 'activeNames': active.index.tolist(), 'activeValues': active.values.tolist(), 'percentage': percentage, 'emoji': emoji_df['Emoji'].tolist(), 'number': emoji_df['Number'].tolist(), 'monthName': months.index.tolist(), 'monthValues': months.values.tolist(), 'image': img}
 
 def generateDf(file_content, contactName):
 
@@ -126,9 +129,14 @@ def percentageMsgSent(df):
 
 def wordcloud(df):
     wc = WordCloud(width=500, height=500, min_font_size=5, background_color='white')
-    df_wc = wc.generate(df['Message'].str.cat(sep=" "))
-    plt.imshow(df_wc)
-    plt.show()
+    img_buf = BytesIO()
+    wc.to_image().save(img_buf, format='PNG')
+    img_buf.seek(0)
+
+    # Encode the image data as Base64
+    img_base64 = base64.b64encode(img_buf.read()).decode('utf-8')
+
+    return img_base64
 
 def frequentEmojis(df):
     emojis = []
